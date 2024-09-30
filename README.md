@@ -40,3 +40,15 @@ A voice-controlled text-to-speech software for blind and visually impaired learn
    NOTE: Make sure you are in the right directory 
     ```bash
     python main.py
+
+## Contact Information
+
+For any questions or feedback, please reach out to the project maintainer:
+
+- **Name**: Your Name
+- **Email**: your.email@example.com
+- **GitHub**: [Shiiroi](https://github.com/Shiiroi)
+
+## Acknowledgments
+
+This project is inspired by the need for accessible education tools for blind and visually impaired learners. Special thanks to the developers of the libraries used in this project for their invaluable contributions.
