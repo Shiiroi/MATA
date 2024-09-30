@@ -1,40 +1,37 @@
+# Standard library imports
+import os
+import re
+import time
+import threading
+import math
+import tempfile
+
+# Third-party library imports
+import tkinter as tk
 from tkinter import *
-import PyPDF2
-import pyttsx3
-import pygame
-from gtts import gTTS
-import speech_recognition as sr
 from tkinter import filedialog
 from tkinter import messagebox
-import ttkbootstrap as ttk
-import pygame.mixer as pym
+from tkinter import scrolledtext
 
-from operator import length_hint
-from pyexpat import model
 from mutagen.mp3 import MP3
-import time, os
-import threading
-
-
-import re
-
+import PyPDF2
+from gtts import gTTS
+import speech_recognition as sr
+import pygame
+import pygame.mixer as pym
+import ttkbootstrap as ttk
 from pdfminer.high_level import extract_pages
 from pdfminer.layout import LTTextContainer, LTChar
 import pdfplumber
 
-import os
-
-import tempfile
-
-
+# Initialize Pygame
 pym.init()
 pygame.mixer.init()
 
+# Global variables
 results = []
-
-import tempfile
-
 temp_file_path = None
+
 
 def cleanup_temp_file():
     global temp_file_path
@@ -48,13 +45,28 @@ def cleanup_temp_file():
         # Now delete the file
         os.remove(temp_file_path)
 
+# Function to extract text and format from page elements
+def text_extraction(element):
+    line_text = element.get_text()
+    
+    # Find formats of the text
+    line_formats = []
+    for text_line in element:
+        if isinstance(text_line, LTTextContainer):
+            for character in text_line:
+                if isinstance(character, LTChar):
+                    line_formats.append(character.fontname)
+                    line_formats.append(character.size)
+    
+    format_per_line = list(set(line_formats))
+    return line_text, format_per_line
 
+# Function to convert text to speech and save it as an MP3
 def speak_text(text, pdf_name):
     global temp_file_path
 
-    # Create a gTTS object
+    # Create a gTTS object (using 'tl' for Tagalog, you can change the language if needed)
     tts = gTTS(text=text, lang='tl')
-
 
     # Extract the base name of the PDF file
     base_name = os.path.splitext(os.path.basename(pdf_name))[0]
@@ -70,122 +82,53 @@ def speak_text(text, pdf_name):
 
     # Save the speech to the temporary file
     tts.save(temp_file_path)
-    print(temp_file_path)
+    print(f"MP3 file saved at: {temp_file_path}")
     return temp_file_path
 
-
-# def speak_text(text,name):
-#     # Create a gTTS object
-#     tts = gTTS(text=text, lang='en')
-
-#     # Save the speech to an audio file
-#     tts.save(name + ".mp3")
-#     print(name + ".mp3")
-#     return name + ".mp3"
-
-def text_extraction(element):
-    # Extracting the text from the in line text element
-    line_text = element.get_text()
-    
-    # Find the formats of the text
-    # Initialize the list with all the formats appeared in the line of text
-    line_formats = []
-    for text_line in element:
-        if isinstance(text_line, LTTextContainer):
-            # Iterating through each character in the line of text
-            for character in text_line:
-                if isinstance(character, LTChar):
-                    # Append the font name of the character
-                    line_formats.append(character.fontname)
-                    # Append the font size of the character
-                    line_formats.append(character.size)
-    # Find the unique font sizes and names in the line
-    format_per_line = list(set(line_formats))
-    
-    # Return a tuple with the text in each line along with its format
-    return (line_text, format_per_line)
-# Extracting tables from the page
-
+# Function to extract text from PDF and convert it to MP3
 def text_to_mp3(pdf_path):
-    # Create a pdf file object
+    # Create a pdf reader object
     pdfFileObj = open(pdf_path, 'rb')
-# Create a pdf reader object
     pdfReaded = PyPDF2.PdfReader(pdfFileObj)
-# Create the dictionary to extract text from each image
-    text_per_page = {}
-# Create a boolean variable for image detection
-    image_flag = False
+    
+    # Initialize a variable to store text from all pages
+    full_text = ''
 
-# We extract the pages from the PDF
+    # We extract the pages from the PDF
     for pagenum, page in enumerate(extract_pages(pdf_path)):
         print("Processing Page:", pagenum)
+        
         # Initialize the variables needed for the text extraction from the page
         pageObj = pdfReaded.pages[pagenum]
         page_text = []
-        line_format = []
-        page_content = []
-        # Initialize the number of the examined tables
-        table_in_page= -1
-        # Open the pdf file
-        pdf = pdfplumber.open(pdf_path)
 
+        # Extract elements on the page
+        page_elements = [(element.y1, element) for element in page._objs]
+        page_elements.sort(key=lambda a: a[0], reverse=True)
 
-    # Find all the elements
-    page_elements = [(element.y1, element) for element in page._objs]
-    # Sort all the element as they appear in the page 
-    page_elements.sort(key=lambda a: a[0], reverse=True)
+        # Iterate over the elements to extract text and format
+        for i, component in enumerate(page_elements):
+            element = component[1]
+            if isinstance(element, LTTextContainer):
+                line_text, _ = text_extraction(element)
+                page_text.append(line_text)
 
+        # Append the text from the current page
+        full_text += ' '.join(page_text) + '\n'
 
-    # Find the elements that composed a page
-    for i,component in enumerate(page_elements):
-        # Extract the element of the page layout
-        element = component[1]
+    # Clean up the text by removing unwanted characters (optional)
+    full_text = re.sub(r'\|', '', full_text)
+    # Clean up the extracted text by replacing multiple newlines with a single space
+    full_text = " ".join(full_text.splitlines()).strip()
+    print(f"Extracted Text: {full_text}...")  # Preview the first 500 characters
 
-            # Check if the element is text element
-        if isinstance(element, LTTextContainer):
-            # Use the function to extract the text and format for each text element
-            (line_text, format_per_line) = text_extraction(element)
-            # Append the text of each line to the page text
-            page_text.append(line_text)
-            # Append the format for each line containing text
-            line_format.append(format_per_line)
-            page_content.append(line_text)
+    display_text_in_gui(full_text)
+    # Convert the text to speech using gTTS
+    mp3_file_path = speak_text(full_text, pdf_path)
 
-
-    # Create the key of the dictionary
-    dctkey = 'Page_'+str(pagenum)
-    # Add the list of list as value of the page key
-    text_per_page[dctkey]= [page_text, line_format,]
-    # Close the pdf file object
     pdfFileObj.close()
-    # Delete the additional files created if image is detected
-    if image_flag:
-        os.remove('cropped_image.pdf')
-        os.remove('PDF_image.png')
-    # Display the content of the page
-    result = ''
-    for page_key in text_per_page.keys():
-        # result += ''.join(text_per_page[page_key][4])  # Concatenate text content from each page
-        # Display the content of the page
-        result = ''
-        for page_key in text_per_page.keys():
-            # Concatenate text content from each line on the page
-            for line_text in text_per_page[page_key][0]:
-                result += line_text
 
-
-    mp3_file_path = r"C:\Users\Vince Roi\Desktop"
-    result = re.sub(r'\|', '', result)
-
-    print(result)
-
-
-    results.append(result)
-
-
-    file_name = os.path.basename(pdf_path)
-    return speak_text(result,file_name)
-
+    return mp3_file_path  # Return the path to the generated mp3 file
 
 running = True
 playlist = []
@@ -244,6 +187,11 @@ def start_voice_recognition():
     global running
     while running:  # Check the running flag
         voice_control()
+        check_status()
+        print(stopped)
+        print("is playing:",playing)
+        print("current time:",slider_progress.get())
+        print("total time:",math.floor(total_time))
 
 def find_index(string, string_list):
     try:
@@ -252,26 +200,23 @@ def find_index(string, string_list):
     except ValueError:
         return None
 
-def rewind():
+def rewind(event=None):
+    global stopped, playing, total_time, converted_total_time, current_song_name
     try:
         playlist_index = find_index(current_song_name, playlist)
-        if not stopped:
-            slider_progress.set(0)
-            pym.music.rewind()
-            pym.music.play(loops=0)
-        elif playlist_index is not None:
-            playsong(playlist_index)
-        else:
-            slider_progress.set(0)
-            pym.music.rewind()
-            pym.music.play(loops=0)
-            current_time = slider_progress.get()
-            new_time = min(current_time, total_time) 
-            slider_progress.set(new_time)
-            pym.music.play(loops=0, start=new_time)
     except Exception as e:
         print(f"Error: No PDF is playing - {str(e)}")
-
+    else:
+        if playing:
+            slider_progress.set(0)
+            pym.music.rewind()
+            pym.music.play(loops=0)
+        elif not stopped:
+            rewindsong(playlist_index)
+        else:
+            playsong(playlist_index)
+        
+            
 
 def fast_forward():
     try:
@@ -339,7 +284,7 @@ def playsong(n):
         lbl_upnexttitle['text'] = os.path.basename(playlist[n+1])
     except IndexError:
         lbl_upnexttitle['text'] = os.path.basename(playlist[0])
-        
+
     playing = True
     stopped = False
     btn_playpause['text'] = "Stop"
@@ -356,6 +301,29 @@ def playsong(n):
     pym.music.load(playlist[n])
     pym.music.play(loops=0)
     play_time()
+
+def check_status():
+    global playing, stopped
+    # This checks if the music has stopped playing
+    if not pym.music.get_busy():
+        playing = False
+        print("Song finished playing")
+        if int(slider_progress.get()) >= int((total_time)):
+            stopped = True
+
+
+def rewindsong(n):
+        
+    playbtn()
+    pym.music.play(loops=0)
+    playing = True
+    pym.music.load(playlist[n])
+    lbl_currenttime['text'] = "00:00"
+    btn_playpause['text'] = "Stop"
+    slider_progress.set(0)
+    print(current_song_name)
+
+
 
 def playbtn(x=None):
     global playing
@@ -474,6 +442,24 @@ def play_time():
 
     id_ = lbl_currenttime.after(1000, play_time)
     
+def play_time_rewind():
+    global id_
+    converted_current_time = time.strftime('%M:%S', time.gmtime(int(slider_progress.get())))
+    if int(slider_progress.get())==int(total_time):
+        if autoplay==True:
+            nextbtn()
+            return
+        else:
+            stop()
+    elif playing==True:
+        next_time = int(slider_progress.get()) + 1
+        slider_progress['value'] = next_time
+        lbl_currenttime['text'] = converted_current_time
+    else:
+        pass
+
+    id_ = lbl_currenttime.after(1000, play_time)    
+    
 def slider(event):
     if not stopped:
         pym.music.play(loops=0, start=slider_progress.get())
@@ -578,32 +564,6 @@ def show_playlist():
 
         playlist_window.mainloop()
 
-def show_shortcuts():
-
-    help_window = Toplevel()
-    help_window.resizable(False, False)
-    help_window.title("MATA - Shortcuts")
-
-    frm_heading = Frame(help_window)
-    frm_heading.grid(column=0, padx=5, pady=5, row=0)
-    lbl_heading = Label(frm_heading, font="{consolas} 24 {}", justify="center", text='Shortcut Keys')
-    lbl_heading.grid(column=0, row=0)
-
-    frm_shortcuts = Frame(help_window)
-    frm_shortcuts.grid(column=0, row=1)
-    lbl_funcheading = LabelFrame(frm_shortcuts, height=200, text='FUNCTION', width=200)
-    lbl_funcheading.grid(column=1, ipadx=10, padx=10, pady=10, row=0)
-    lbl_functions = Label(lbl_funcheading, font="{consolas} 12", justify="left", text='Open Files\nPlay/Stop\nNext\nPrevious\nMute/Unmute')
-    lbl_functions.grid(column=0, padx=10, pady=10, row=0)
-
-    lbl_keysheading = LabelFrame(frm_shortcuts)
-    lbl_keysheading.grid(column=0, padx=10, pady=10, row=0)
-    lbl_keysheading.configure(height=200, text='KEY', width=200)
-    lbl_keys = Label(lbl_keysheading, font="{consolas} 12 {}", justify="center", text='O\nSpace\nN\nP\nX\nM')
-    lbl_keys.grid(column=0, padx=10, pady=10, row=0)
-
-    help_window.mainloop()
-
 def close():
     cleanup_temp_file()
     global running
@@ -611,38 +571,58 @@ def close():
     time.sleep(0.5)
     root.destroy()
 
-def show_about():
-    about_window = Toplevel()
-    about_window.resizable(False, False)
-    about_window.title("MATA Player - About")
 
-    lbl_heading = Label(about_window, font=("", 24), text='About ', width=5)
-    lbl_heading.grid(column=0, row=0)
+def display_text_in_gui(extracted_text):
+        # Clean up the extracted text by replacing multiple newlines with a single space
+    cleaned_text = " ".join(extracted_text.splitlines()).strip()
+    
+    # Create a LabelFrame for extracted text
+    lbl_extracted = ttk.LabelFrame(root, text="EXTRACTED TEXT", relief="ridge")
+    lbl_extracted.grid(row=5, column=0, padx=10, pady=10, sticky="nsew")
+
+    # Create a ScrolledText widget for displaying the extracted text
+    text_widget = scrolledtext.ScrolledText(lbl_extracted, wrap=tk.WORD, width=60, height=15, font=("Helvetica", 12))
+    text_widget.pack(padx=10, pady=10)
+
+    # Insert the extracted text into the ScrolledText widget
+    text_widget.insert(tk.END, extracted_text)
+
+    # Disable the widget so it’s read-only
+    text_widget.config(state=tk.DISABLED)
+
+    
+
 
 # traditional approach
-root = ttk.Window()  # Create an instance of ttk.Window
+root = tk.Tk()  # Create an instance of Tk
 root.title("MATA")  # Set the title of the window
-root.geometry('550x475')
+root.geometry('700x700')
 root.resizable(0, 0)
 root.iconbitmap('icons/mata.ico')
 style = ttk.Style("darkly")
 
-lbl_currentlyplaying = ttk.LabelFrame(root, text="CURRENTLY PLAYING",  relief=RIDGE)
-lbl_currentlyplaying.grid(row=0, column=0, padx=3)
-lbl_currentlyplayingtitle = ttk.Label(lbl_currentlyplaying, text='WELCOME TO MATA\n ', width=60, wraplength=480,anchor='center')
-lbl_currentlyplayingtitle.grid(row=0, column=2)
+# Adjust the grid layout to center components
+root.grid_columnconfigure(0, weight=1)
 
+# Current Playing section
+lbl_currentlyplaying = ttk.LabelFrame(root, text="CURRENTLY PLAYING", relief="ridge")
+lbl_currentlyplaying.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+lbl_currentlyplayingtitle = ttk.Label(lbl_currentlyplaying, text='WELCOME TO MATA\n ', width=60, wraplength=480, anchor='center', justify='center')
+lbl_currentlyplayingtitle.grid(row=0, column=0)
+
+# Controls section
 frm_controls = ttk.Frame(root)
 frm_controls.grid(row=1, column=0, pady=10)
-btn_previous = ttk.Button(frm_controls, text="Previous", command=prevbtn)
+btn_previous = ttk.Button(frm_controls, text="Previous", command=lambda: print("Previous"))
 btn_previous.grid(row=0, column=0, padx=10, pady=2)
-btn_playpause = ttk.Button(frm_controls, text="Play", command=playbtn)
+btn_playpause = ttk.Button(frm_controls, text="Play", command=lambda: print("Play"))
 btn_playpause.grid(row=0, column=1, padx=10, pady=2)
-btn_next = ttk.Button(frm_controls, text="Next", command=nextbtn)
+btn_next = ttk.Button(frm_controls, text="Next", command=lambda: print("Next"))
 btn_next.grid(row=0, column=2, padx=10, pady=2)
 btn_open = ttk.Button(frm_controls, text="Choose File", command=openfiles)
-btn_open.grid(row=0, column=4, padx=10, pady=2)
+btn_open.grid(row=0, column=3, padx=10, pady=2)
 
+# Autoplay and Playlist controls
 frm_adcontrols = ttk.Frame(root)
 frm_adcontrols.grid(row=2, column=0)
 btn_autoplay = ttk.Button(frm_adcontrols, text="Autoplay: ON", command=toggle_autoplay)
@@ -650,33 +630,36 @@ btn_autoplay.grid(row=0, column=0, pady=10, padx=5)
 btn_playlist = ttk.Button(frm_adcontrols, text='Show Playlist', command=show_playlist)
 btn_playlist.grid(row=0, column=1, pady=10, padx=5)
 
-lbl_volume = ttk.LabelFrame(frm_adcontrols, text='VOLUME',  relief=RIDGE)
+# Volume controls
+lbl_volume = ttk.LabelFrame(frm_adcontrols, text='VOLUME',  relief="ridge")
 lbl_volume.grid(row=0, column=2, pady=10)
 btn_volume = ttk.Button(lbl_volume, text='Mute', command=toggle_mute)
 btn_volume.grid(row=0, column=0, padx=5, pady=3)
-slider_volume = ttk.Scale(lbl_volume, from_=0, to=100, orient=HORIZONTAL, length=150, value=100, command=set_volume)
+slider_volume = ttk.Scale(lbl_volume, from_=0, to=100, orient=tk.HORIZONTAL, length=150, value=100, command=set_volume)
 slider_volume.grid(row=0, column=1, padx=5, pady=3)
 
+# Progress section
 frm_progress = ttk.LabelFrame(root)
 frm_progress.grid(row=3, column=0)
 lbl_currenttime = ttk.Label(frm_progress, text="00:00")
 lbl_currenttime.grid(row=0, column=0, padx=10)
-slider_progress = ttk.Scale(frm_progress, from_=0, to=100, orient=HORIZONTAL, length=365, value=0, command=slider)
+slider_progress = ttk.Scale(frm_progress, from_=0, to=100, orient=tk.HORIZONTAL, length=365, value=0, command=slider)
 slider_progress.grid(row=0, column=1, pady=20)
 lbl_totaltime = ttk.Label(frm_progress, text="00:00")
 lbl_totaltime.grid(row=0, column=2, padx=10)
 
-lbl_upnext = ttk.LabelFrame(root, text="UP NEXT",relief=RIDGE)
-lbl_upnext.grid(row=4, column=0, padx=3, pady=10)
+# Up Next section
+lbl_upnext = ttk.LabelFrame(root, text="UP NEXT", relief="ridge")
+lbl_upnext.grid(row=4, column=0, padx=10, pady=10)
 lbl_upnexttitle = ttk.Label(lbl_upnext, text='\n', font=('consolas', 10), width=60, wraplength=480, anchor='center')
-lbl_upnexttitle.grid(row=0, column=2)
-
+lbl_upnexttitle.grid(row=0, column=0)
 root.bind('<space>', playbtn)
 root.bind('m', toggle_mute)
 root.bind('n', nextbtn)
 root.bind('p', prevbtn)
 root.bind('<Control-o>', openfiles)
 root.bind('<Control-f>', openfolder)
+root.bind('r',rewind)
 # Bind fast forward and backward functions to corresponding keys
 root.bind('<Right>', lambda event: fast_forward())
 root.bind('<Left>', lambda event: fast_backward())
