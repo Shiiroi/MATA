@@ -45,8 +45,8 @@ A voice-controlled text-to-speech software for blind and visually impaired learn
 
 For any questions or feedback, please reach out to the project maintainer:
 
-- **Name**: Your Name
-- **Email**: your.email@example.com
+- **Name**: Vince Magwili
+- **Email**: vmagwili@gmail.com
 - **GitHub**: [Shiiroi](https://github.com/Shiiroi)
 
 ## Acknowledgments
