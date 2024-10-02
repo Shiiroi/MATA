@@ -60,4 +60,4 @@ This project is licensed under the GNU General Public License v3.0. You may copy
 
 ## References
 
-The base code for the MP3 player side of the project is from [Bloom Player](https://github.imc.re/bitan005/Bloom-Player?tab=readme-ov-file) developed by [@bitan005](https://github.com/bitan005) and [@TheKaushikGoswami](https://github.com/TheKaushikGoswami), licensed under GNU GPLv3. The original project was used as a foundation for the development of the text extraction, text-to-speech, and voice-control features in MATA.
+The base code for the MP3 player side of the project is from [Bloom Player](https://github.imc.re/bitan005/Bloom-Player) developed by [@bitan005](https://github.com/bitan005) and [@TheKaushikGoswami](https://github.com/TheKaushikGoswami), licensed under GNU GPLv3. The original project was used as a foundation for the development of the text extraction, text-to-speech, and voice-control features in MATA.
