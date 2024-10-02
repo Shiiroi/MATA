@@ -31,7 +31,13 @@ pygame.mixer.init()
 # Global variables
 results = []
 temp_file_path = None
+selected_language = 'en'
 
+# Function to handle language selection
+def change_language(event):
+    global selected_language
+    selected_language = language_dict[language_var.get()]
+    print(f"Language selected: {selected_language}")
 
 def cleanup_temp_file():
     global temp_file_path
@@ -65,8 +71,7 @@ def text_extraction(element):
 def speak_text(text, pdf_name):
     global temp_file_path
 
-    # Create a gTTS object (using 'tl' for Tagalog, you can change the language if needed)
-    tts = gTTS(text=text, lang='tl')
+    tts = gTTS(text=text, lang=selected_language)
 
     # Extract the base name of the PDF file
     base_name = os.path.splitext(os.path.basename(pdf_name))[0]
@@ -590,8 +595,6 @@ def display_text_in_gui(extracted_text):
     # Disable the widget so it’s read-only
     text_widget.config(state=tk.DISABLED)
 
-    
-
 
 # traditional approach
 root = tk.Tk()  # Create an instance of Tk
@@ -608,7 +611,7 @@ root.grid_columnconfigure(0, weight=1)
 lbl_currentlyplaying = ttk.LabelFrame(root, text="CURRENTLY PLAYING", relief="ridge")
 lbl_currentlyplaying.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 lbl_currentlyplayingtitle = ttk.Label(lbl_currentlyplaying, text='WELCOME TO MATA\n ', width=60, wraplength=480, anchor='center', justify='center')
-lbl_currentlyplayingtitle.grid(row=0, column=0)
+lbl_currentlyplayingtitle.grid(row=0, column=3)
 
 # Controls section
 frm_controls = ttk.Frame(root)
@@ -621,6 +624,14 @@ btn_next = ttk.Button(frm_controls, text="Next", command=lambda: print("Next"))
 btn_next.grid(row=0, column=2, padx=10, pady=2)
 btn_open = ttk.Button(frm_controls, text="Choose File", command=openfiles)
 btn_open.grid(row=0, column=3, padx=10, pady=2)
+# Language selection 
+language_var = tk.StringVar()  # To hold the selected language's display name
+language_dict = {'English': 'en', 'Tagalog': 'tl'}  # Mapping of displayed text to value
+
+language_options = ttk.Combobox(frm_controls, textvariable=language_var, values=list(language_dict.keys()), state='readonly', width=20)
+language_options.grid(row=0, column=4, padx=10, pady=2)
+language_options.bind('<<ComboboxSelected>>', change_language)
+language_options.current(0)  # Set the default selection to English
 
 # Autoplay and Playlist controls
 frm_adcontrols = ttk.Frame(root)
@@ -647,6 +658,8 @@ slider_progress = ttk.Scale(frm_progress, from_=0, to=100, orient=tk.HORIZONTAL,
 slider_progress.grid(row=0, column=1, pady=20)
 lbl_totaltime = ttk.Label(frm_progress, text="00:00")
 lbl_totaltime.grid(row=0, column=2, padx=10)
+
+
 
 # Up Next section
 lbl_upnext = ttk.LabelFrame(root, text="UP NEXT", relief="ridge")
