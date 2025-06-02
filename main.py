@@ -24,6 +24,8 @@ from pdfminer.high_level import extract_pages
 from pdfminer.layout import LTTextContainer, LTChar
 import pdfplumber
 
+from ui import setup_ui
+
 # Initialize Pygame
 pym.init()
 pygame.mixer.init()
@@ -154,39 +156,43 @@ recognizer = sr.Recognizer()
 def voice_control():
     global recognizer
     print("Voice control function called.")
-    with sr.Microphone() as source:
-        recognizer.adjust_for_ambient_noise(source,0.5)  # Adjust for ambient noise
-        print("Listening for a command...")
-        try:
-            audio = recognizer.listen(source, timeout=5)  # Adjust the timeout as needed
-            print("Audio captured.")
-            command = recognizer.recognize_google(audio).lower()  
-            print("You said: " + command)
-            if "play" in command:
-                play_pdf()
-            elif "stop" in command:
-                pause_pdf()
-            elif "next" in command:
-                nextbtn()
-            elif "previous" in command:
-                prevbtn()
-            elif "mute" in command:
-                toggle_mute()
-            elif "forward" in command:
-                fast_forward()
-            elif "backward" in command:
-                fast_backward()
-            elif "rewind" in command:  # Rewind functionality
-                rewind()
-            else:
-                print("Command not recognized.")
-        except sr.UnknownValueError:
-            print("Google could not understand the audio.")
-        except sr.RequestError as e:
-            print("Error with Google recognition: {0}".format(e))
-        except sr.WaitTimeoutError:
-            print("Timeout: No speech detected within the timeout period.")
-            pass  # Handle timeout (no speech detected within the timeout period)
+    try:
+        with sr.Microphone() as source:
+            recognizer.adjust_for_ambient_noise(source, 0.5)  # Adjust for ambient noise
+            print("Listening for a command...")
+            try:
+                audio = recognizer.listen(source, timeout=5)  # Adjust the timeout as needed
+                print("Audio captured.")
+                command = recognizer.recognize_google(audio).lower()
+                print("You said: " + command)
+                if "play" in command:
+                    play_pdf()
+                elif "stop" in command:
+                    pause_pdf()
+                elif "next" in command:
+                    nextbtn()
+                elif "previous" in command:
+                    prevbtn()
+                elif "mute" in command:
+                    toggle_mute()
+                elif "forward" in command:
+                    fast_forward()
+                elif "backward" in command:
+                    fast_backward()
+                elif "rewind" in command:  # Rewind functionality
+                    rewind()
+                else:
+                    print("Command not recognized.")
+            except sr.UnknownValueError:
+                print("Google could not understand the audio.")
+            except sr.RequestError as e:
+                print(f"Error with Google recognition: {e}")
+            except sr.WaitTimeoutError:
+                print("Timeout: No speech detected within the timeout period.")
+    except OSError as e:
+        print(f"Microphone error: {e}")
+    except Exception as e:
+        print(f"Unexpected error in voice control: {e}")
 
 def start_voice_recognition():
     global running
@@ -213,9 +219,11 @@ def rewind(event=None):
         print(f"Error: No PDF is playing - {str(e)}")
     else:
         if playing:
-            slider_progress.set(0)
+            slider_progress.set(0)  # Reset slider to the beginning
+            lbl_currenttime['text'] = "00:00"  # Reset timestamp to the beginning
             pym.music.rewind()
             pym.music.play(loops=0)
+            play_time()  # Restart the logic for updating slider and timestamp
         elif not stopped:
             rewindsong(playlist_index)
         else:
@@ -227,20 +235,24 @@ def fast_forward():
     try:
         current_time = slider_progress.get()
         new_time = min(current_time + 10, total_time)  # Fast forward by 10 seconds
-        slider_progress.set(new_time)
+        slider_progress.set(new_time)  # Update slider position
+        lbl_currenttime['text'] = time.strftime('%M:%S', time.gmtime(new_time))  # Update timestamp
         pym.music.play(loops=0, start=new_time)
-    except:
-        print("Error: No PDF is playing")
+        play_pdf()
+    except Exception as e:
+        print(f"Error: {str(e)}")
 
 def fast_backward():
     try:
         current_time = slider_progress.get()
         new_time = max(current_time - 10, 0)  # Rewind by 10 seconds
-        slider_progress.set(new_time)
+        slider_progress.set(new_time)  # Update slider position
+        lbl_currenttime['text'] = time.strftime('%M:%S', time.gmtime(new_time))  # Update timestamp
         pym.music.play(loops=0, start=new_time)
-    except:
-        print("Error: No PDF is playing")
-        
+        play_pdf()
+    except Exception as e:
+        print(f"Error: {str(e)}")
+
 def openfolder(x=None):
     folder_path = str(filedialog.askdirectory(title='Choose Folder'))
     if folder_path=="":
@@ -360,7 +372,7 @@ def play_pdf():
 def pause_pdf():
     global playing
     if playlist != [] and stopped == False:
-        btn_playpause['text'] = "Play"
+        btn_playpause['text'] = "Play"  # Update button text to "Play"
         playing = False
         pym.music.pause()
 
@@ -408,7 +420,7 @@ def stop(x=None):
     global stopped, playing
     playing = False
     stopped = True
-    btn_playpause['text'] = "Play"
+    btn_playpause['text'] = "Play"  # Update button text to "Play"
     lbl_currentlyplayingtitle['text'] = '\n'
     lbl_upnexttitle['text'] = '\n'
     lbl_currenttime['text'] = '00:00'
@@ -596,7 +608,7 @@ def display_text_in_gui(extracted_text):
     text_widget.config(state=tk.DISABLED)
 
 
-# traditional approach
+
 root = tk.Tk()  # Create an instance of Tk
 root.title("MATA")  # Set the title of the window
 root.geometry('700x700')
@@ -604,68 +616,6 @@ root.resizable(0, 0)
 root.iconbitmap('icons/mata.ico')
 style = ttk.Style("darkly")
 
-# Adjust the grid layout to center components
-root.grid_columnconfigure(0, weight=1)
-
-# Current Playing section
-lbl_currentlyplaying = ttk.LabelFrame(root, text="CURRENTLY PLAYING", relief="ridge")
-lbl_currentlyplaying.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
-lbl_currentlyplayingtitle = ttk.Label(lbl_currentlyplaying, text='WELCOME TO MATA\n ', width=60, wraplength=480, anchor='center', justify='center')
-lbl_currentlyplayingtitle.grid(row=0, column=3)
-
-# Controls section
-frm_controls = ttk.Frame(root)
-frm_controls.grid(row=1, column=0, pady=10)
-btn_previous = ttk.Button(frm_controls, text="Previous", command=lambda: print("Previous"))
-btn_previous.grid(row=0, column=0, padx=10, pady=2)
-btn_playpause = ttk.Button(frm_controls, text="Play", command=lambda: print("Play"))
-btn_playpause.grid(row=0, column=1, padx=10, pady=2)
-btn_next = ttk.Button(frm_controls, text="Next", command=lambda: print("Next"))
-btn_next.grid(row=0, column=2, padx=10, pady=2)
-btn_open = ttk.Button(frm_controls, text="Choose File", command=openfiles)
-btn_open.grid(row=0, column=3, padx=10, pady=2)
-# Language selection 
-language_var = tk.StringVar()  # To hold the selected language's display name
-language_dict = {'English': 'en', 'Tagalog': 'tl'}  # Mapping of displayed text to value
-
-language_options = ttk.Combobox(frm_controls, textvariable=language_var, values=list(language_dict.keys()), state='readonly', width=20)
-language_options.grid(row=0, column=4, padx=10, pady=2)
-language_options.bind('<<ComboboxSelected>>', change_language)
-language_options.current(0)  # Set the default selection to English
-
-# Autoplay and Playlist controls
-frm_adcontrols = ttk.Frame(root)
-frm_adcontrols.grid(row=2, column=0)
-btn_autoplay = ttk.Button(frm_adcontrols, text="Autoplay: ON", command=toggle_autoplay)
-btn_autoplay.grid(row=0, column=0, pady=10, padx=5)
-btn_playlist = ttk.Button(frm_adcontrols, text='Show Playlist', command=show_playlist)
-btn_playlist.grid(row=0, column=1, pady=10, padx=5)
-
-# Volume controls
-lbl_volume = ttk.LabelFrame(frm_adcontrols, text='VOLUME',  relief="ridge")
-lbl_volume.grid(row=0, column=2, pady=10)
-btn_volume = ttk.Button(lbl_volume, text='Mute', command=toggle_mute)
-btn_volume.grid(row=0, column=0, padx=5, pady=3)
-slider_volume = ttk.Scale(lbl_volume, from_=0, to=100, orient=tk.HORIZONTAL, length=150, value=100, command=set_volume)
-slider_volume.grid(row=0, column=1, padx=5, pady=3)
-
-# Progress section
-frm_progress = ttk.LabelFrame(root)
-frm_progress.grid(row=3, column=0)
-lbl_currenttime = ttk.Label(frm_progress, text="00:00")
-lbl_currenttime.grid(row=0, column=0, padx=10)
-slider_progress = ttk.Scale(frm_progress, from_=0, to=100, orient=tk.HORIZONTAL, length=365, value=0, command=slider)
-slider_progress.grid(row=0, column=1, pady=20)
-lbl_totaltime = ttk.Label(frm_progress, text="00:00")
-lbl_totaltime.grid(row=0, column=2, padx=10)
-
-
-
-# Up Next section
-lbl_upnext = ttk.LabelFrame(root, text="UP NEXT", relief="ridge")
-lbl_upnext.grid(row=4, column=0, padx=10, pady=10)
-lbl_upnexttitle = ttk.Label(lbl_upnext, text='\n', font=('consolas', 10), width=60, wraplength=480, anchor='center')
-lbl_upnexttitle.grid(row=0, column=0)
 root.bind('<space>', playbtn)
 root.bind('m', toggle_mute)
 root.bind('n', nextbtn)
@@ -673,12 +623,8 @@ root.bind('p', prevbtn)
 root.bind('<Control-o>', openfiles)
 root.bind('<Control-f>', openfolder)
 root.bind('r',rewind)
-# Bind fast forward and backward functions to corresponding keys
 root.bind('<Right>', lambda event: fast_forward())
 root.bind('<Left>', lambda event: fast_backward())
-# You can call the voice_control function whenever you want to listen for a command
-# For example, you can bind it to a specific key, such as 'v' key:
-# root.bind('v', lambda event: voice_control())
 
 
 # Create a daemon thread for voice recognition
@@ -686,6 +632,20 @@ voice_thread = threading.Thread(target=start_voice_recognition, daemon=True)
 
 # Start the voice recognition thread
 voice_thread.start()
+
+# Use the setup_ui function to initialize the UI
+ui_elements = setup_ui(root, playbtn, prevbtn, nextbtn, openfiles, toggle_autoplay, show_playlist, toggle_mute, set_volume, slider, fast_forward, fast_backward, rewind)
+
+# Access UI elements
+lbl_currentlyplayingtitle = ui_elements["lbl_currentlyplayingtitle"]
+btn_playpause = ui_elements["btn_playpause"]
+btn_autoplay = ui_elements["btn_autoplay"]
+slider_progress = ui_elements["slider_progress"]
+lbl_currenttime = ui_elements["lbl_currenttime"]
+lbl_totaltime = ui_elements["lbl_totaltime"]
+lbl_upnexttitle = ui_elements["lbl_upnexttitle"]
+language_var = ui_elements["language_var"]
+language_dict = ui_elements["language_dict"]
 
 root.protocol("WM_DELETE_WINDOW", close)
 root.mainloop()
